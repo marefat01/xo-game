@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>XO Game</title>
+<style>
+  :root {
+    --bg: #12141c;
+    --card: #1b1e29;
+    --cell: #232837;
+    --x-color: #f0a04b;
+    --o-color: #4dd3c4;
+    --win: #6c4fd6;
+    --text: #eef0f5;
+    --muted: #8b8fa3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+  }
+  .card {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 28px 26px 22px;
+    width: 320px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    text-align: center;
+  }
+  h1 {
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: 1px;
+  }
+  h1 span { color: var(--x-color); }
+  .sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .status {
+    margin: 16px 0 14px;
+    min-height: 22px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .cell {
+    aspect-ratio: 1;
+    background: var(--cell);
+    border: none;
+    border-radius: 12px;
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .cell:hover:not(:disabled) {
+    background: #2a3040;
+  }
+  .cell.x { color: var(--x-color); }
+  .cell.o { color: var(--o-color); }
+  .cell.win {
+    background: var(--win);
+    color: #fff;
+  }
+  .cell:disabled { cursor: default; }
+  .scores {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #2a2f3d;
+  }
+  .score { flex: 1; }
+  .score .label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+  .score .value {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+  .score.x .value { color: var(--x-color); }
+  .score.o .value { color: var(--o-color); }
+  .reset {
+    margin-top: 18px;
+    background: transparent;
+    border: 1px solid #333a4d;
+    color: var(--muted);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .reset:hover { color: var(--text); border-color: #555c73; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1><span>X</span>O Game</h1>
+    <div class="sub" id="sub">Tap a cell to play</div>
+    <div class="status" id="status"></div>
+    <div class="grid" id="grid"></div>
+    <div class="scores">
+      <div class="score x">
+        <div class="label">PLAYER X</div>
+        <div class="value" id="scoreX">0</div>
+      </div>
+      <div class="score">
+        <div class="label">DRAWS</div>
+        <div class="value" id="scoreD">0</div>
+      </div>
+      <div class="score o">
+        <div class="label">PLAYER O</div>
+        <div class="value" id="scoreO">0</div>
+      </div>
+    </div>
+    <button class="reset" id="resetBtn">Reset Scores</button>
+  </div>
+
+<script>
+  const grid = document.getElementById('grid');
+  const statusEl = document.getElementById('status');
+  const subEl = document.getElementById('sub');
+  const scoreXEl = document.getElementById('scoreX');
+  const scoreOEl = document.getElementById('scoreO');
+  const scoreDEl = document.getElementById('scoreD');
+
+  let board = Array(9).fill(null);
+  let current = 'X';
+  let gameOver = false;
+  let scores = { X: 0, O: 0, D: 0 };
+
+  const wins = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  function buildGrid() {
+    grid.innerHTML = '';
+    board.forEach((val, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'cell';
+      btn.dataset.index = i;
+      btn.addEventListener('click', () => handleMove(i));
+      grid.appendChild(btn);
+    });
+  }
+
+  function handleMove(i) {
+    if (gameOver || board[i]) return;
+    board[i] = current;
+    render();
+    const winLine = checkWin();
+    if (winLine) {
+      gameOver = true;
+      scores[current]++;
+      statusEl.textContent = `${current} wins! 🎉`;
+      subEl.textContent = 'Game over';
+      highlight(winLine);
+      updateScores();
+      return;
+    }
+    if (board.every(c => c)) {
+      gameOver = true;
+      scores.D++;
+      statusEl.textContent = "It's a draw!";
+      subEl.textContent = 'Game over';
+      updateScores();
+      return;
+    }
+    current = current === 'X' ? 'O' : 'X';
+    subEl.textContent = `${current}'s turn`;
+  }
+
+  function checkWin() {
+    for (const line of wins) {
+      const [a,b,c] = line;
+      if (board[a] && board[a] === board[b] && board[a] === board[c]) return line;
+    }
+    return null;
+  }
+
+  function highlight(line) {
+    line.forEach(i => {
+      grid.children[i].classList.add('win');
+    });
+  }
+
+  function render() {
+    board.forEach((val, i) => {
+      const cell = grid.children[i];
+      cell.textContent = val || '';
+      cell.classList.toggle('x', val === 'X');
+      cell.classList.toggle('o', val === 'O');
+      cell.disabled = !!val || gameOver;
+    });
+  }
+
+  function updateScores() {
+    scoreXEl.textContent = scores.X;
+    scoreOEl.textContent = scores.O;
+    scoreDEl.textContent = scores.D;
+  }
+
+  function resetBoard() {
+    board = Array(9).fill(null);
+    current = 'X';
+    gameOver = false;
+    statusEl.textContent = '';
+    subEl.textContent = "Tap a cell to play";
+    buildGrid();
+    render();
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    scores = { X: 0, O: 0, D: 0 };
+    updateScores();
+    resetBoard();
+  });
+
+  // Start a fresh game automatically after a win/draw, on next click of an empty board area
+  document.body.addEventListener('click', (e) => {
+    if (gameOver && e.target.classList.contains('cell')) {
+      resetBoard();
+    }
+  });
+
+  buildGrid();
+  render();
+</script>
+</body>
+</html>
